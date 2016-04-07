@@ -5,7 +5,7 @@ var Tree = require('../lib/tree');
 
 const process = require('process');
 var shortId = require('shortid');
-var should = require('should');
+var should = require('chai').should();
 
 var Schema = Mongoose.Schema;
 
@@ -45,27 +45,23 @@ describe('tree tests', function () {
 
     User.remove({}, function (err) {
 
-      should.not.exist(err);
-
       Promise.all([
         new User({ name: 'Adam' }).save(),
         new User({ name: 'Eden' }).save()
       ])
-      .spread(function(adam, eden) {
+      .spread(function (adam, eden) {
         return Promise.all([
           new User({ name: 'Bob', parent: adam._id }).save(),
           new User({ name: 'Carol', parent: adam._id }).save()
         ]);
       })
-      .spread(function(bob, carol) {
-        return Promise.all([
-          new User({ name: 'Dann', parent: carol._id }).save()
-        ])
+      .spread(function (bob, carol) {
+        return new User({ name: 'Dann', parent: carol._id }).save();
       })
-      .then(function(dann) {
+      .then(function (dann) {
         return new User({ name: 'Emily', parent: dann._id }).save()
       })
-      .then(function(result) {
+      .then(function (emily) {
         done();
       });
     });
@@ -74,126 +70,160 @@ describe('tree tests', function () {
 
   describe('adding documents', function () {
 
-    it('should set parent id and path', function (done) {
-
+    it('should set parent', function (done) {
       User.find()
-        .then(function(users) {
-          var names = {};
-          users.forEach(function (user) {
-            names[user.name] = user;
-          });
-
-          should.not.exist(names['Adam'].parent);
-          names['Bob'].parent.toString().should.equal(names['Adam']._id.toString());
-          names['Carol'].parent.toString().should.equal(names['Adam']._id.toString());
-          names['Dann'].parent.toString().should.equal(names['Carol']._id.toString());
-          names['Emily'].parent.toString().should.equal(names['Dann']._id.toString());
-
-          var expectedPath = [names['Adam']._id, names['Carol']._id, names['Dann']._id].join('.');
-          names['Dann'].path.should.equal(expectedPath);
-
-          done();
+      .then(function (users) {
+        var names = {};
+        users.forEach(function (user) {
+          names[user.name] = user;
         });
+        should.not.exist(names['Adam'].parent);
+        names['Bob'].parent.toString().should.equal(names['Adam']._id.toString());
+        names['Carol'].parent.toString().should.equal(names['Adam']._id.toString());
+        names['Dann'].parent.toString().should.equal(names['Carol']._id.toString());
+        names['Emily'].parent.toString().should.equal(names['Dann']._id.toString());
+        done();
+      });
     });
+
+    it('should set path', function (done) {
+      User.find()
+      .then(function (users) {
+        var names = {};
+        users.forEach(function (user) {
+          names[user.name] = user;
+        });
+        var expectedPath = [names['Adam']._id, names['Carol']._id, names['Dann']._id, names['Emily']._id].join('.');
+        names['Emily'].path.should.equal(expectedPath);
+        done();
+      });
+    });
+
+  });
+
+  describe('updating document', function() {
+
+    it('should update parent', function (done) {
+      Promise.all([
+        User.findOne({ name: 'Bob' }),
+        User.findOne({ name: 'Emily' })
+      ])
+      .spread(function (bob, emily) {
+        bob.parent = emily._id;
+        return Promise.all([
+          bob.save(),
+          emily._id
+        ]);
+      })
+      .spread(function (newBob, emilyId) {
+        newBob.parent.toString().should.eql(emilyId.toString());
+        done();
+      });
+    });
+
+    it('should update path', function (done) {
+      Promise.all([
+        User.findOne({ name: 'Bob' }),
+        User.findOne({ name: 'Emily' })
+      ])
+      .spread(function (bob, emily) {
+        bob.parent = emily._id;
+        return Promise.all([
+          bob.save(),
+          emily.path
+        ]);
+      })
+      .spread(function (newBob, emilyPath) {
+        var expectedPath = [emilyPath, newBob._id.toString()].join('.');
+        newBob.path.should.eql(expectedPath);
+        done();
+      });
+    });
+
+    it('should keep parent for leaf nodes', function (done) {
+      Promise.all([
+        User.findOne({ name: 'Bob' }),
+        User.findOne({ name: 'Carol' })
+      ])
+      .spread(function (bob, carol) {
+        carol.parent = bob._id;
+        return carol.save();
+      })
+      .then(function (newCarol) {
+        return Promise.all([
+          User.findOne({ name: 'Dann' }),
+          User.findOne({ name: 'Emily' }),
+          newCarol
+        ])
+      })
+      .spread(function (dann, emily, carol) {
+        dann.parent.toString().should.eql(carol._id.toString());
+        done();
+      });
+    });
+
+    it('should update path for all leaf nodes', function (done) {
+      Promise.all([
+        User.findOne({ name: 'Bob' }),
+        User.findOne({ name: 'Carol' })
+      ])
+      .spread(function (bob, carol) {
+        carol.parent = bob._id;
+        return carol.save();
+      })
+      .then(function (newCarol) {
+        return Promise.all([
+          User.findOne({ name: 'Dann' }),
+          User.findOne({ name: 'Emily' }),
+          newCarol
+        ])
+      })
+      .spread(function (dann, emily, carol) {
+        var expectedPathForDann = [carol.path, dann._id.toString()].join('.');
+        var expectedPathForEmily = [dann.path, emily._id.toString()].join('.');
+        dann.path.should.eql(expectedPathForDann);
+        emily.path.should.eql(expectedPathForEmily);
+        done();
+      });
+    });
+
   });
 
 
   describe('removing document', function () {
 
     it('should remove leaf nodes', function (done) {
-
-      User.findOne({ name: 'Emily' }, function (err, emily) {
-
-        emily.remove(function (err) {
-
-          should.not.exist(err);
-
-          User.find(function (err, users) {
-
-            should.not.exist(err);
-            users.length.should.equal(5);
-            _.pluck(users, 'name').should.not.include('Emily');
-            done();
-          });
-        });
+      User.findOne({ name: 'Emily' })
+      .then(function (emily) {
+        return emily.remove();
+      })
+      .then(function (status) {
+        return User.find();
+      })
+      .then(function (users) {
+        users.length.should.eql(5);
+        _.map(users, 'name').should.not.include('Emily');
+        done();
       });
     });
 
     it('should remove all children', function (done) {
-
-      User.findOne({ name: 'Carol' }, function (err, user) {
-
-        should.not.exist(err);
-
-        user.remove(function (err) {
-
-          should.not.exist(err);
-
-          User.find(function (err, users) {
-
-            should.not.exist(err);
-
-            users.length.should.equal(3);
-            _.pluck(users, 'name').should.include('Adam').and.include('Bob');
-            done();
-          });
-        });
+      User.findOne({ name: 'Carol' })
+      .then(function (carol) {
+        return carol.remove();
+      })
+      .then(function (status) {
+        return User.find();
+      })
+      .then(function (users) {
+        users.length.should.equal(3);
+        _.map(users, 'name').should.include('Adam');
+        _.map(users, 'name').should.include('Bob');
+        done();
       });
     });
+    
   });
-
-
-  function checkPaths(done) {
-    User.find({}, function (err, users) {
-
-      should.not.exist(err);
-
-      var ids = {};
-      users.forEach(function (user) {
-
-        ids[user._id] = user;
-      });
-
-      users.forEach(function (user) {
-
-        if (!user.parent) {
-          return;
-        }
-        should.exist(ids[user.parent]);
-        user.path.should.equal(ids[user.parent].path + "." + user._id);
-      });
-
-      done();
-    });
-  }
-
-
-  describe('moving documents', function () {
-
-    it('should change children paths', function (done) {
-
-      User.find({}, function (err, users) {
-        should.not.exist(err);
-
-        var names = {};
-        users.forEach(function (user) {
-
-          names[user.name] = user;
-        });
-
-        var carol = names['Carol'];
-        var bob = names['Bob'];
-
-        carol.parent = bob;
-        carol.save(function (err) {
-
-          should.not.exist(err);
-          checkPaths(done);
-        });
-      });
-    });
-  });
-
 
   describe('get children', function () {
 
