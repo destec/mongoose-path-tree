@@ -6,18 +6,19 @@
     "Tomáš Holas <tomas.holas@gmail.com>",
     "Oleg Butovich <obutovich@gmail.com>",
     "Jake Dempsey <angelo0000@gmail.com>",
-    "Alban Escalier (DaWyz)"
+    "Alban Escalier (DaWyz)",
+    "Destec <catalyst.zhang@gmail.com>"
   ],
-  "name": "mongoose-path-tree",
-  "description": "Maintaied version of materialized path hierarchy for mongoose with reparent option",
-  "homepage": "https://github.com/swayf/mongoose-path-tree",
+  "name": "mongoose-path-tree-promisify",
+  "description": "The promisified version of materialized path hierarchy for mongoose with reparent option",
+  "homepage": "https://github.com/destec/mongoose-path-tree",
   "repository": {
     "type": "git",
-    "url": "git://github.com/swayf/mongoose-path-tree.git"
+    "url": "git://github.com/destec/mongoose-path-tree.git"
   },
   "main": "index.js",
-  "version": "1.3.5",
-  "engine": "node >= 0.8.0",
+  "version": "0.1.0",
+  "engine": "node >= 0.12.0",
   "dependencies": {
     "bluebird": "^3.3.4",
     "chai": "^3.5.0",
@@ -41,7 +42,12 @@
     "materialized",
     "path",
     "tree",
-    "mongodb"
+    "mongodb",
+    "promise",
+    "promisify"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/destec/mongoose-path-tree/issues"
+  }
 }
